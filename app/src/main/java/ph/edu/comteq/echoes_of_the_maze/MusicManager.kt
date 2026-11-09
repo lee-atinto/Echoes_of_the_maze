@@ -16,19 +16,14 @@ object MusicManager {
 
         try {
             val player = MediaPlayer()
-            val afd = appContext.assets.openFd(
-                "music_and_sound/Mr.Cat - Bit Piano Music.mp3"
-            )
-
-            player.setDataSource(
-                afd.fileDescriptor,
-                afd.startOffset,
-                afd.length
-            )
+            val afd = appContext.assets.openFd("music_and_sound/Mr.Cat - Bit Piano Music.mp3")
+            player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
 
             player.isLooping = true
-            player.setVolume(savedLevel / 15f, savedLevel / 15f)
+            val linear = savedLevel.coerceIn(0, 15) / 15f
+            val volume = linear * linear
+            player.setVolume(volume, volume)
             player.prepare()
             player.start()
 
@@ -40,7 +35,8 @@ object MusicManager {
     }
 
     fun setVolume(level: Int) {
-        val volume = level.coerceIn(1, 15) / 15f
+        val linear = level.coerceIn(0, 15) / 15f
+        val volume = linear * linear
         mediaPlayer?.setVolume(volume, volume)
     }
 
