@@ -40,8 +40,7 @@ fun SettingsScreen(
     val sharedPrefs = remember {
         context.getSharedPreferences("game_settings", Context.MODE_PRIVATE)
     }
-    val savedSoundLevel = remember { sharedPrefs.getInt("sound_level", 15) }
-    val savedMusicLevel = remember { sharedPrefs.getInt("music_level", 15) }
+
     val backgroundBitmap = rememberAssetImage("background/main_menu_screen_background.png")
     val boxSettingsBitmap = rememberAssetImage("menu_icon/box_settings.png")
     val textSettingsBitmap = rememberAssetImage("menu_icon/text_settings.png")
@@ -51,8 +50,13 @@ fun SettingsScreen(
     val volumeDownBitmap = rememberAssetImage("menu_icon/volume_down.png")
     val saveBitmap = rememberAssetImage("menu_icon/save.png")
     val declineBitmap = rememberAssetImage("menu_icon/decline.png")
-    var soundLevel by remember { mutableIntStateOf(savedSoundLevel) }
-    var musicLevel by remember { mutableIntStateOf(savedMusicLevel) }
+
+    var soundLevel by remember {
+        mutableIntStateOf(sharedPrefs.getInt("sound_level", 15))
+    }
+    var musicLevel by remember {
+        mutableIntStateOf(sharedPrefs.getInt("music_level", 15))
+    }
 
     Box(
         modifier = Modifier
@@ -165,14 +169,14 @@ fun SettingsScreen(
                             detectTapGestures { offset ->
                                 val clickedIndex = ((offset.x / size.width) * 15).toInt().coerceIn(0, 14)
                                 musicLevel = clickedIndex + 1
-                                MusicManager.setVolume(musicLevel)
+                                sharedPrefs.edit().putInt("music_level", musicLevel).apply()
                             }
                         }
                         .pointerInput(Unit) {
                             detectDragGestures { change, _ ->
                                 val draggedIndex = ((change.position.x / size.width) * 15).toInt().coerceIn(0, 14)
                                 musicLevel = draggedIndex + 1
-                                MusicManager.setVolume(musicLevel)
+                                sharedPrefs.edit().putInt("music_level", musicLevel).apply()
                             }
                         },
                     verticalAlignment = Alignment.CenterVertically,
@@ -227,7 +231,6 @@ fun SettingsScreen(
                                         putInt("music_level", musicLevel)
                                         apply()
                                     }
-                                    MusicManager.setVolume(musicLevel)
                                     onSaveClicked()
                                 },
                             contentScale = ContentScale.Fit,
@@ -242,7 +245,6 @@ fun SettingsScreen(
                                 .width(130.dp)
                                 .height(30.dp)
                                 .clickable {
-                                    MusicManager.setVolume(savedMusicLevel)
                                     onDeclineClicked()
                                 },
                             contentScale = ContentScale.Fit,
