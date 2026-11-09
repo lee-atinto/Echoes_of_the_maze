@@ -40,10 +40,8 @@ fun SettingsScreen(
     val sharedPrefs = remember {
         context.getSharedPreferences("game_settings", Context.MODE_PRIVATE)
     }
-
     val savedSoundLevel = remember { sharedPrefs.getInt("sound_level", 15) }
     val savedMusicLevel = remember { sharedPrefs.getInt("music_level", 15) }
-
     val backgroundBitmap = rememberAssetImage("background/main_menu_screen_background.png")
     val boxSettingsBitmap = rememberAssetImage("menu_icon/box_settings.png")
     val textSettingsBitmap = rememberAssetImage("menu_icon/text_settings.png")
@@ -53,7 +51,6 @@ fun SettingsScreen(
     val volumeDownBitmap = rememberAssetImage("menu_icon/volume_down.png")
     val saveBitmap = rememberAssetImage("menu_icon/save.png")
     val declineBitmap = rememberAssetImage("menu_icon/decline.png")
-
     var soundLevel by remember { mutableIntStateOf(savedSoundLevel) }
     var musicLevel by remember { mutableIntStateOf(savedMusicLevel) }
 

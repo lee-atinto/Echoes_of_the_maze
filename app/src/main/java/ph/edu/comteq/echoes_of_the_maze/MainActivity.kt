@@ -12,6 +12,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Start background music via MusicManager
         MusicManager.start(this)
 
         setContent {
@@ -29,6 +31,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // Keep music playing across activities
         super.onDestroy()
     }
 }

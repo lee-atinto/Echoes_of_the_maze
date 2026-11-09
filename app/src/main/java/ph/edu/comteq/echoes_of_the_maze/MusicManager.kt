@@ -22,7 +22,7 @@ object MusicManager {
 
             player.isLooping = true
             val linear = savedLevel.coerceIn(0, 15) / 15f
-            val volume = linear * linear
+            val volume = linear * linear // Exponential curve for natural volume scaling
             player.setVolume(volume, volume)
             player.prepare()
             player.start()
