@@ -1,5 +1,6 @@
 package ph.edu.comteq.echoes_of_the_maze
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,10 +40,19 @@ import kotlin.math.abs
 @Composable
 fun GameplayScreen(
     levelId: Int,
-    onGameFinished: (Int, Boolean) -> Unit
+    onGameFinished: (Int, Boolean) -> Unit,
+    onRestartClicked: () -> Unit,
+    onNextLevelClicked: () -> Unit,
+    onMenuClicked: () -> Unit
 ) {
     val context = LocalContext.current
-    val mapBitmap = rememberAssetImage("map_level/map_level_1.png")
+    val sharedPreferences = remember {
+        context.getSharedPreferences("game_progress", Context.MODE_PRIVATE)
+    }
+
+    val mapAssetPath = if (levelId == 1) "map_level/map_level_1.png" else "map_level/map_level_2_part_1.png"
+    val mapBitmap = rememberAssetImage(mapAssetPath)
+
     val keyBitmap = rememberAssetImage("objects/key_door.png")
 
     val doorBitmaps = listOf(
@@ -53,7 +64,10 @@ fun GameplayScreen(
         rememberAssetImage("objects/door_animation_open6.png")
     )
 
-    val player = remember { Player(initialX = 1, initialY = 4, context = context) }
+    val player = remember(levelId) {
+        if (levelId == 1) Player(initialX = 1, initialY = 4, context = context)
+        else Player(initialX = 7, initialY = 4, context = context)
+    }
 
     var direction by remember { mutableStateOf("down") }
     var isMoving by remember { mutableStateOf(false) }
@@ -62,25 +76,15 @@ fun GameplayScreen(
 
     var doorState by remember { mutableIntStateOf(0) }
     var isOpeningDoor by remember { mutableStateOf(false) }
+    var isLevelCompleted by remember { mutableStateOf(false) }
 
-    val level1Grid = remember {
-        arrayOf(
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1),
-            intArrayOf(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            intArrayOf(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
-        )
-    }
+    val levelGrid = remember { GameLevels.getLevelGrid(levelId) }
 
-    var keyPos by remember { mutableStateOf(Pair(13, 4)) }
-    var doorPos by remember { mutableStateOf(Pair(7, 9)) }
+    val initialKeyPos = if (levelId == 1) Pair(13, 4) else Pair(13, 5)
+    val initialDoorPos = if (levelId == 1) Pair(7, 9) else Pair(7, 2)
+
+    var keyPos by remember { mutableStateOf(initialKeyPos) }
+    var doorPos by remember { mutableStateOf(initialDoorPos) }
 
     val distanceToKey = abs(player.x - keyPos.first) + abs(player.y - keyPos.second)
     val isNearKey = !hasKey && keyPos.first >= 0 && keyPos.second >= 0 && distanceToKey <= 1
@@ -95,13 +99,20 @@ fun GameplayScreen(
                 delay(100L)
             }
             doorState = 7
-            level1Grid[doorPos.second][doorPos.first] = 0
-            onGameFinished(100, true)
+            levelGrid[doorPos.second][doorPos.first] = 0
+
+            val nextLevel = levelId + 1
+            sharedPreferences.edit()
+                .putBoolean("level_${levelId}_completed", true)
+                .putBoolean("level_${nextLevel}_unlocked", true)
+                .apply()
+
+            isLevelCompleted = true
         }
     }
 
     LaunchedEffect(isMoving, direction) {
-        if (isMoving) {
+        if (isMoving && !isLevelCompleted) {
             while (isMoving) {
                 var dx = 0
                 var dy = 0
@@ -112,7 +123,7 @@ fun GameplayScreen(
                     "right" -> dx = 1
                 }
 
-                player.move(dx, dy, level1Grid)
+                player.move(dx, dy, levelGrid)
                 currentFrame++
                 delay(75L)
             }
@@ -137,12 +148,12 @@ fun GameplayScreen(
                         )
                     }
 
-                    val tileWidth = size.width / level1Grid[0].size
-                    val tileHeight = size.height / level1Grid.size
+                    val tileWidth = size.width / levelGrid[0].size
+                    val tileHeight = size.height / levelGrid.size
 
-                    for (row in level1Grid.indices) {
-                        for (col in level1Grid[row].indices) {
-                            val color = if (level1Grid[row][col] == 1) Color.Red.copy(alpha = 0.3f) else Color.Green.copy(alpha = 0.1f)
+                    for (row in levelGrid.indices) {
+                        for (col in levelGrid[row].indices) {
+                            val color = if (levelGrid[row][col] == 1) Color.Red.copy(alpha = 0.3f) else Color.Green.copy(alpha = 0.1f)
                             drawRect(
                                 color = color,
                                 topLeft = Offset(col * tileWidth, row * tileHeight),
@@ -208,7 +219,7 @@ fun GameplayScreen(
                 }
         )
 
-        if (isNearKey) {
+        if (isNearKey && !isLevelCompleted) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -220,7 +231,7 @@ fun GameplayScreen(
                     color = Color.Yellow
                 )
             }
-        } else if (isNearDoor && doorState == 0) {
+        } else if (isNearDoor && doorState == 0 && !isLevelCompleted) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -234,133 +245,178 @@ fun GameplayScreen(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            contentAlignment = Alignment.BottomStart
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.size(150.dp)
+        if (!isLevelCompleted) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.BottomStart
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color.Blue)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    direction = "up"
-                                    isMoving = true
-                                    tryAwaitRelease()
-                                    isMoving = false
-                                    player.stopMoving()
-                                }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.size(150.dp)
                 ) {
-                    Text("▲", color = Color.White)
-                }
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(Color.Blue)
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = {
+                                        direction = "up"
+                                        isMoving = true
+                                        tryAwaitRelease()
+                                        isMoving = false
+                                        player.stopMoving()
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("▲", color = Color.White)
+                    }
 
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(Color.Blue)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            direction = "left"
+                                            isMoving = true
+                                            tryAwaitRelease()
+                                            isMoving = false
+                                            player.stopMoving()
+                                        }
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("◀", color = Color.White)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(Color.Blue)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            direction = "right"
+                                            isMoving = true
+                                            tryAwaitRelease()
+                                            isMoving = false
+                                            player.stopMoving()
+                                        }
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("▶", color = Color.White)
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(Color.Blue)
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = {
+                                        direction = "down"
+                                        isMoving = true
+                                        tryAwaitRelease()
+                                        isMoving = false
+                                        player.stopMoving()
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("▼", color = Color.White)
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.BottomEnd
+            ) {
                 Row(
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(Color.Blue)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        direction = "left"
-                                        isMoving = true
-                                        tryAwaitRelease()
-                                        isMoving = false
-                                        player.stopMoving()
-                                    }
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("◀", color = Color.White)
+                    if (isNearKey) {
+                        Button(
+                            onClick = {
+                                hasKey = true
+                                keyPos = Pair(-1, -1)
+                            }
+                        ) {
+                            Text(text = "Pick")
+                        }
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(Color.Blue)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        direction = "right"
-                                        isMoving = true
-                                        tryAwaitRelease()
-                                        isMoving = false
-                                        player.stopMoving()
-                                    }
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("▶", color = Color.White)
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color.Blue)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    direction = "down"
-                                    isMoving = true
-                                    tryAwaitRelease()
-                                    isMoving = false
-                                    player.stopMoving()
+                    if (isNearDoor && doorState == 0) {
+                        Button(
+                            onClick = {
+                                if (hasKey) {
+                                    isOpeningDoor = true
                                 }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("▼", color = Color.White)
+                            }
+                        ) {
+                            Text(text = "Open")
+                        }
+                    }
                 }
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            contentAlignment = Alignment.BottomEnd
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Bottom
+        if (isLevelCompleted) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
             ) {
-                if (isNearKey) {
-                    Button(
-                        onClick = {
-                            hasKey = true
-                            keyPos = Pair(-1, -1)
-                        }
-                    ) {
-                        Text(text = "Pick")
-                    }
-                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .background(Color.DarkGray)
+                        .padding(24.dp)
+                ) {
+                    Text(
+                        text = "LEVEL COMPLETED!",
+                        color = Color.Yellow
+                    )
 
-                if (isNearDoor && doorState == 0) {
                     Button(
-                        onClick = {
-                            if (hasKey) {
-                                isOpeningDoor = true
-                            }
-                        }
+                        modifier = Modifier.width(180.dp),
+                        onClick = { onRestartClicked() }
                     ) {
-                        Text(text = "Open")
+                        Text("Restart")
+                    }
+
+                    Button(
+                        modifier = Modifier.width(180.dp),
+                        onClick = { onNextLevelClicked() }
+                    ) {
+                        Text("Next Level")
+                    }
+
+                    Button(
+                        modifier = Modifier.width(180.dp),
+                        onClick = { onMenuClicked() }
+                    ) {
+                        Text("Menu")
                     }
                 }
             }

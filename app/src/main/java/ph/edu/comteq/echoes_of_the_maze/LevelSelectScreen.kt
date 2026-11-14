@@ -1,5 +1,6 @@
 package ph.edu.comteq.echoes_of_the_maze
 
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,20 +17,48 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 @Composable
 fun LevelSelectScreen(
     onLevelSelected: (Int) -> Unit,
     onQuitClicked: () -> Unit
 ) {
+    val context = LocalContext.current
+    val sharedPreferences = remember {
+        context.getSharedPreferences("game_progress", Context.MODE_PRIVATE)
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var refreshTrigger by remember { mutableStateOf(0) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val levelBoxBitmap = rememberAssetImage("menu_icon/level_box.png")
     val levelsTitleBitmap = rememberAssetImage("menu_icon/text_levels.png")
     val levelShadowBitmap = rememberAssetImage("menu_icon/level_shadow.png")
@@ -38,6 +67,7 @@ fun LevelSelectScreen(
     val levelClosedBitmap = rememberAssetImage("menu_icon/level_closed.png")
     val lockedBitmap = rememberAssetImage("menu_icon/locked.png")
     val starUnlitBitmap = rememberAssetImage("menu_icon/unstar.png")
+    val starLitBitmap = rememberAssetImage("menu_icon/star.png")
     val nextBackBitmap = rememberAssetImage("menu_icon/next_back.png")
     val quitBitmap = rememberAssetImage("menu_icon/quit.png")
 
@@ -93,7 +123,12 @@ fun LevelSelectScreen(
                     ) {
                         for (col in 0..2) {
                             val levelId = row * 3 + col + 1
-                            val isUnlocked = levelId == 1
+                            val isUnlocked = remember(refreshTrigger) {
+                                levelId == 1 || sharedPreferences.getBoolean("level_${levelId}_unlocked", false)
+                            }
+                            val isCompleted = remember(refreshTrigger) {
+                                sharedPreferences.getBoolean("level_${levelId}_completed", false)
+                            }
                             val isOpen = openedLevels[levelId] == true
 
                             Box(
@@ -170,7 +205,8 @@ fun LevelSelectScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         for (i in 0..2) {
-                                            starUnlitBitmap?.let { star ->
+                                            val starBitmap = if (isCompleted) starLitBitmap else starUnlitBitmap
+                                            starBitmap?.let { star ->
                                                 Image(
                                                     bitmap = star,
                                                     contentDescription = null,
