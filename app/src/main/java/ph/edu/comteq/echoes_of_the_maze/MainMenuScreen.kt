@@ -28,7 +28,6 @@ fun MainMenuScreen(
     onSettingsClicked: () -> Unit
 ) {
     val context = LocalContext.current
-
     val backgroundBitmap = rememberAssetImage("background/main_menu_screen_background.png")
     val startBitmap = rememberAssetImage("menu_icon/start.png")
     val settingsBitmap = rememberAssetImage("menu_icon/settings.png")
